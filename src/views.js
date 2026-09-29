@@ -1,3 +1,5 @@
+import {vocabularyView,vocabularySentence} from './vocabulary-views.js';
+import {selectedWords,wordDue} from './vocabulary.js';
 import {lessons,getLesson,expressions} from './content.js';import {selectDue,localDate} from './learning.js';
 const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;};
 const append=(node,...children)=>{children.flat().filter(Boolean).forEach(c=>node.append(c));return node;};
@@ -17,7 +19,8 @@ export function render(root,state,ui,onAction){
  if(ui.corruptRaw!==undefined){shell.append(card(el('h2','','原始记录无法读取'),el('p','muted','原始数据已保留。可以先下载原始记录，再确认重置。'),btn('下载原始记录','exportRaw',null,'button secondary'),btn('重置损坏记录','recover',null,'button danger')));root.replaceChildren(shell);return;}
  const main=el('main');main.id='main';
  const learnBtn=(minutes,cls='button')=>btn(`${minutes} 分钟${minutes===2?'复习':minutes===5?'短课':'完整练习'}`,'start',{minutes},cls);
- if(ui.page==='home'){
+ if(ui.page==='words'||ui.page==='wordReview'){main.append(vocabularyView({state,ui,el,append,btn,card,title}));const audio=el('p','audio-status');audio.id='audio-status';audio.setAttribute('role','status');main.append(audio);
+ }else if(ui.page==='home'){
  main.append(title('A LITTLE, EVERY DAY','让英语，回到生活里。','不用等一段完整的时间。现在几分钟，就很好。'));
  const next=lessons.find(l=>!completed.has(l.id))||lessons[0];
  const hero=el('section','hero');
@@ -35,6 +38,7 @@ export function render(root,state,ui,onAction){
  }else if(ui.page==='review'){
  main.append(title('HELLO AGAIN','再见一次，就更熟一点。','先试着回忆，再看答案。练习记录不等于口语评分。'));
  main.append(card(append(el('div','review-number'),el('strong','',String(due.length)),el('span','','个表达到期')),el('p','muted',due.length?'每次最多复习 3 个，轻松开始。':Object.keys(state.expressions).length?'今天没有到期内容，也可以温习已经学过的表达。':'先学一句，再把它慢慢记住。'),learnBtn(2)));
+ main.append(card(el('h2','','课程生词本'),el('p','muted',`已收藏 ${selectedWords(state).length} 个 · 今天到期 ${wordDue(state,localDate()).length} 个`),btn('打开生词本','word-book',null,'button secondary'),el('p','footnote','今天可以选句子或单词复习，不必两项都做。')));
  const ids=due.length?due:Object.keys(state.expressions);for(const id of ids){const e=expressions[id],r=state.expressions[id];main.append(card(el('p','en small-en',e.en),el('p','',e.zh),el('small','muted',`下次复习 ${r.dueDate} · ${r.lastOutcome==='retry'?'需要再练':'已独立练习'}`)));}
  }else if(ui.page==='profile'){
  main.append(title('YOUR OWN PACE','按自己的节奏。','学习记录只保存在当前设备，请定期导出备份。'));
@@ -58,12 +62,12 @@ export function render(root,state,ui,onAction){
  main.append(title(`LESSON ${lessons.indexOf(lesson)+1} · ${lesson.title}`,{dialogue:'先听一段生活。',choice:'你听懂了吗？',learn:'这句话，很用得上。',recall:'不看英文，试着说。',order:'把这句话，拼出来。',personal:'换成你的生活。'}[step.kind]));
  const body=card();
  if(step.kind==='dialogue'){
- lesson.dialogue.forEach((d,i)=>{const row=append(el('div',`dialogue-row speaker-${d.speaker}`),el('span','avatar',d.speaker),append(el('div','dialogue-copy'),el('p','en',d.en),ui.translation&&el('p','translation',d.zh),btn('▷ 听这一句','speak',d.en,'audio-button')));body.append(row);});body.append(btn(ui.translation?'收起中文':'查看中文','translation',null,'text-button'));body.append(btn('听懂了，试一题 →','advance',{evidence:'exposure'}));
+ lesson.dialogue.forEach((d,i)=>{const row=append(el('div',`dialogue-row speaker-${d.speaker}`),el('span','avatar',d.speaker),append(el('div','dialogue-copy'),vocabularySentence(d.en,lesson.id,'en',{el,btn}),ui.translation&&el('p','translation',d.zh),btn('▷ 听这一句','speak',d.en,'audio-button')));body.append(row);});body.append(el('p','muted small-text','带下划线的词可点击查看释义并收藏。'));body.append(btn(ui.translation?'收起中文':'查看中文','translation',null,'text-button'));body.append(btn('听懂了，试一题 →','advance',{evidence:'exposure'}));
  }else if(step.kind==='choice'){
  body.append(el('h2','',lesson.question.prompt));lesson.question.options.forEach((o,i)=>body.append(btn(`${String.fromCharCode(65+i)}  ${o}`,'choice',i,'option',ui.answered===true)));
  if(ui.feedback)body.append(el('p',`feedback ${ui.answered?'correct':''}`,ui.feedback));if(ui.answered)body.append(btn('继续学表达 →','advance',{evidence:'objective'}));
  }else if(step.kind==='learn'){
- body.append(el('span','pill','实用表达'),el('p','en expression',e.en),el('p','translation',e.zh),btn('▷ 听示范','speak',e.en,'button secondary'),el('p','note',e.note),btn('准备好了，试着回忆 →','advance',{evidence:'exposure'}));
+ body.append(el('span','pill','实用表达'),vocabularySentence(e.en,lesson.id,'en expression',{el,btn}),el('p','translation',e.zh),btn('▷ 听示范','speak',e.en,'button secondary'),el('p','note',e.note),btn('准备好了，试着回忆 →','advance',{evidence:'exposure'}));
  }else if(step.kind==='recall'){
  body.append(el('p','recall-zh',e.zh),el('p','muted','先自己说一句。不用完美，能表达意思就好。'));
  if(mark.hinted||ui.reveal)body.append(el('p','en expression',e.en),btn('▷ 听示范','speak',e.en,'audio-button'));
@@ -85,6 +89,6 @@ export function render(root,state,ui,onAction){
  }
  }else{main.append(title('TAKE YOUR TIME','从今天开始。'),btn('回到首页','nav','home'));}
  shell.append(main);
- const nav=el('nav','bottom-nav');nav.setAttribute('aria-label','主导航');for(const [key,label] of Object.entries(labels)){const b=btn('','nav',key,`nav-item ${ui.page===key?'active':''}`);append(b,el('span','nav-icon',{home:'◒',scenes:'▦',review:'↻',profile:'◯'}[key]),el('span','',label));if(ui.page===key)b.setAttribute('aria-current','page');nav.append(b);}shell.append(nav);root.replaceChildren(shell);
+ const nav=el('nav','bottom-nav');nav.setAttribute('aria-label','主导航');for(const [key,label] of Object.entries(labels)){const b=btn('','nav',key,`nav-item ${(ui.page===key||(key==='review'&&['words','wordReview'].includes(ui.page)))?'active':''}`);append(b,el('span','nav-icon',{home:'◒',scenes:'▦',review:'↻',profile:'◯'}[key]),el('span','',label));if(ui.page===key)b.setAttribute('aria-current','page');nav.append(b);}shell.append(nav);root.replaceChildren(shell);
  function lessonCard(l){const b=btn('','start',{minutes:5,lessonId:l.id},'lesson-card');append(b,el('span','lesson-icon',l.icon),append(el('div','lesson-card-copy'),el('small','muted',`SCENE ${String(lessons.indexOf(l)+1).padStart(2,'0')}${completed.has(l.id)?' · 已完成':''}`),el('strong','',l.title),el('span','muted small-text',l.subtitle)),el('span','arrow','↗'));return b;}
 }

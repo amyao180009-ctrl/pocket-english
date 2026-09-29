@@ -1,0 +1,11 @@
+import {words} from './vocabulary-content.js';import {addDays} from './learning.js';
+const empty=()=>({saved:{},review:null});
+const copy=state=>{const next=structuredClone(state);next.vocabulary??=empty();return next;};
+export const selectedWords=state=>Object.keys(state.vocabulary?.saved||{}).filter(id=>state.vocabulary.saved[id].selected);
+export const wordDue=(state,day)=>selectedWords(state).filter(id=>state.vocabulary.saved[id].dueDate<=day).sort((a,b)=>state.vocabulary.saved[a].dueDate.localeCompare(state.vocabulary.saved[b].dueDate)||a.localeCompare(b));
+export function toggleWord(state,id,day){if(!Object.hasOwn(words,id))return state;const next=copy(state),v=next.vocabulary,old=v.saved[id];v.saved[id]=old?{...old,selected:!old.selected}:{selected:true,stage:0,dueDate:day,lastCountedDate:null,lastOutcome:'new'};if(!v.saved[id].selected&&v.review?.ids.includes(id))v.review=null;return next;}
+export function startWordReview(state,{id,day,mode}){if(!['meaning','listen'].includes(mode))return state;if(state.vocabulary?.review&&!state.vocabulary.review.completed)return state;const ids=wordDue(state,day);if(!ids.length)ids.push(...selectedWords(state));if(!ids.length)return state;const next=copy(state);next.vocabulary.review={id,ids:ids.slice(0,3),cursor:0,revealed:false,mode,completed:false};return next;}
+export function revealWord(state){if(!state.vocabulary?.review||state.vocabulary.review.completed)return state;const next=copy(state);next.vocabulary.review.revealed=true;return next;}
+export function answerWord(state,{id,index,day,correct}){const r=state.vocabulary?.review;if(!r||r.id!==id||r.cursor!==index||!r.revealed||r.completed||typeof correct!=='boolean')return state;const next=copy(state),v=next.vocabulary,review=v.review,record=v.saved[review.ids[review.cursor]];
+ if((!record.lastCountedDate||day>record.lastCountedDate)&&(!correct||record.dueDate<=day)){record.stage=correct&&record.lastCountedDate?Math.min(record.stage+1,4):0;record.dueDate=addDays(day,[1,3,7,14,30][record.stage]);record.lastCountedDate=day;record.lastOutcome=correct?'independent':'retry';}
+ review.cursor++;review.revealed=false;review.completed=review.cursor===review.ids.length;return next;}

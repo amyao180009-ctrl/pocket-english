@@ -1,3 +1,4 @@
+import {words} from './vocabulary-content.js';
 import {expressions,getLesson} from './content.js';import {initialState,localDate} from './learning.js';
 export const STORAGE_KEY='adult-english:v1';const MAX=5*1024*1024;
 const obj=x=>!!x&&typeof x==='object'&&!Array.isArray(x);
@@ -20,6 +21,11 @@ export function validateState(s){
  ensure(s.activeSessionId===null||(identifier(s.activeSessionId)&&Object.hasOwn(s.sessions,s.activeSessionId)));
  const eventIds=new Set();for(const e of s.events){ensure(obj(e)&&identifier(e.id)&&!eventIds.has(e.id)&&day(e.date)&&typeof e.correct==='boolean'&&typeof e.hinted==='boolean'&&['objective','self','exposure'].includes(e.evidence));eventIds.add(e.id);const session=s.sessions[e.sessionId];ensure(!!session&&e.id===`${e.sessionId}:${e.stepId}`&&session.steps.slice(0,session.cursor).some(step=>step.id===e.stepId&&step.expressionId===e.expressionId));}
  for(const session of Object.values(s.sessions))for(const step of session.steps.slice(0,session.cursor))ensure(eventIds.has(`${session.id}:${step.id}`));
+ if(s.vocabulary!==undefined){
+ const v=s.vocabulary;ensure(obj(v)&&obj(v.saved));
+ for(const [id,w] of Object.entries(v.saved))ensure(Object.hasOwn(words,id)&&obj(w)&&typeof w.selected==='boolean'&&integer(w.stage,0,4)&&day(w.dueDate)&&(w.lastCountedDate===null||day(w.lastCountedDate))&&(!w.lastCountedDate||w.dueDate>w.lastCountedDate)&&['new','independent','retry'].includes(w.lastOutcome));
+ if(v.review!==null){const r=v.review;ensure(obj(r)&&identifier(r.id)&&Array.isArray(r.ids)&&r.ids.length>0&&r.ids.length<=3&&new Set(r.ids).size===r.ids.length&&r.ids.every(id=>Object.hasOwn(v.saved,id)&&v.saved[id].selected));ensure(integer(r.cursor,0,r.ids.length)&&typeof r.revealed==='boolean'&&typeof r.completed==='boolean'&&r.completed===(r.cursor===r.ids.length)&&['meaning','listen'].includes(r.mode));}
+ }
  ensure(JSON.stringify(s).length<=MAX);return {ok:true};
  }catch(e){return {ok:false,error:e.message||'数据格式无效'};}
 }

@@ -1,3 +1,4 @@
+import {toggleWord,startWordReview,revealWord,answerWord} from './vocabulary.js';
 import {registerOffline,activateUpdate} from './offline.js';
 import {render} from './views.js';import {initialState,startSession,applyEvent,markAttempt,localDate} from './learning.js';import {createStore,STORAGE_KEY,withStorageLock} from './storage.js';import {getLesson,expressions} from './content.js';import {gradeOrder} from './activities.js';import {createSpeech} from './speech.js';
 const root=document.querySelector('#app');let storage;try{storage=window.localStorage;}catch{storage={getItem(){throw Error('unavailable')}};}
@@ -21,7 +22,17 @@ async function onAction({type,payload}){
  if(ui.error&&!['export','exportRaw','recover','reload','retry','nav'].includes(type)){draw();return;}
  const s=state.sessions[state.activeSessionId],step=s&&!s.completed?s.steps[s.cursor]:null;
  switch(type){
- case 'nav':navigate(payload);break;
+ case 'nav':ui.wordId=null;navigate(payload);break;
+ case 'word-open':ui.wordReturn=ui.page;ui.wordId=payload;speech.stop();ui.page='words';draw();window.scrollTo({top:0});break;
+ case 'word-close':ui.wordId=null;ui.page=ui.wordReturn==='learn'?'learn':'words';speech.stop();draw();break;
+ case 'word-book':ui.wordId=null;navigate('words');break;
+ case 'word-filter':ui.wordFilter=payload;draw();break;
+ case 'word-toggle':await persist(toggleWord(state,payload,localDate()));break;
+ case 'word-start':await persist(startWordReview(state,{id:crypto.randomUUID(),day:localDate(),mode:payload}),()=>navigate('wordReview'));break;
+ case 'word-resume':navigate('wordReview');break;
+ case 'word-reveal':await persist(revealWord(state));break;
+ case 'word-mode':{const next=structuredClone(state);if(next.vocabulary?.review){next.vocabulary.review.mode='meaning';speech.stop();await persist(next);}break;}
+ case 'word-answer':speech.stop();await persist(answerWord(state,{...payload,day:localDate()}));break;
  case 'reload':location.reload();break;
  case 'resume':navigate('learn');break;
  case 'start':{const next=startSession(state,{id:crypto.randomUUID(),day:localDate(),minutes:payload.minutes,mode:state.settings.quiet?'quiet':'spoken',lessonId:payload.lessonId});await persist(next,()=>navigate('learn'));break;}
