@@ -1,0 +1,5 @@
+import {CACHE_NAME,installCache,activateCache,resourceURLs} from './src/cache-policy.js';
+self.addEventListener('install',event=>event.waitUntil(installCache(caches,self.registration.scope)));
+self.addEventListener('activate',event=>event.waitUntil((async()=>{await activateCache(caches);await self.clients.claim();})()));
+self.addEventListener('message',event=>{if(event.data==='activate-update'){self.skipWaiting();return;}if(event.data==='cache-status')event.waitUntil((async()=>{const cache=await caches.open(CACHE_NAME);const results=await Promise.all(resourceURLs(self.registration.scope).map(u=>cache.match(u)));event.ports[0]?.postMessage(results.every(Boolean)?'ready':'error');})());});
+self.addEventListener('fetch',event=>{if(event.request.method!=='GET'||!event.request.url.startsWith(self.registration.scope))return;event.respondWith((async()=>{const cache=await caches.open(CACHE_NAME);const saved=await cache.match(event.request);if(saved)return saved;try{return await fetch(event.request);}catch(error){if(event.request.mode==='navigate')return (await cache.match(new URL('index.html',self.registration.scope).href))||Response.error();throw error;}})());});
